@@ -1,4 +1,5 @@
 // WebGL2 & WebGL1 Compatible Full-Screen Snake Back Animation
+// Realistic Keeled Overlapping Scales with 3D Cylindrical Foreshortening
 // Pure Vanilla ES Module - Zero Dependencies
 
 const canvas = document.getElementById('canvas');
@@ -25,9 +26,8 @@ if (!gl) {
 }
 
 // Enable standard derivatives for WebGL1 if needed
-let oesDeriv = null;
 if (!isWebGL2) {
-  oesDeriv = gl.getExtension('OES_standard_derivatives');
+  gl.getExtension('OES_standard_derivatives');
 }
 
 // Vertex Shaders
@@ -51,74 +51,87 @@ uniform vec2 u_resolution;
 uniform float u_time;
 uniform float u_speed;
 
-// Mathematical period of the dorsal pattern in scale rows (even for staggered grid)
+// Mathematical period of dorsal pattern in scale rows (even for staggered lattice)
 const float PATTERN_PERIOD = 8.0;
 
-// Number of scale columns spanning the body width
-const float SCALE_COLUMNS = 16.0;
+// Total scale columns mapped across the visible cylindrical perimeter
+const float SCALE_COLUMNS = 18.0;
 
-// Positive modulo helper
+// Maximum cylinder wrap angle (radians, ~82 degrees for steep edge curving)
+const float MAX_THETA = 1.44;
+
 float pmod(float val, float m) {
   return mod(mod(val, m) + m, m);
 }
 
-// Pseudo-random hash for natural organic scale variance (strictly periodic in v)
+// Organic pseudo-random hash (strictly periodic in v)
 float hash21(vec2 p) {
   p = vec2(pmod(p.x, 64.0), pmod(p.y, PATTERN_PERIOD));
   return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
 }
 
-// Scale evaluation: returns vec4(distance, height, idHash, patternWeight)
+// Lanceolate keeled scale evaluator (matching anatomical reference photo)
+// Returns vec4(spadeDist, surfaceHeight, idHash, macroPatternDist)
 vec4 evalScale(float cu, float cv, float u, float v) {
   vec2 d = vec2(u - cu, v - cv);
 
-  // Diamond bounding box calibrated for gapless shingle overlap
-  float nx = abs(d.x) / 0.54;
-  float ny = abs(d.y) / 1.08;
-  float diamondDist = nx + ny;
+  // Normalized transverse coordinate across scale width
+  float sx = abs(d.x) / 0.52;
 
-  // Keeled ridge: sharp crest running down center of scale (nx = 0)
-  float keel = pow(clamp(1.0 - nx, 0.0, 1.0), 0.70);
+  // Asymmetric longitudinal coordinate:
+  // d.y < 0 is the trailing caudal tip (tapered spade), d.y > 0 is cranial root (tucked)
+  float sy = d.y < 0.0 ? abs(d.y) / 0.98 : d.y / 0.82;
 
-  // Longitudinal arch: trailing caudal tip (-d.y) lifts above underlying scale
-  float arch = clamp(0.70 - d.y * 0.35, 0.25, 1.25);
+  // Lanceolate spade contour: blend between rounded diamond and ovate petal
+  float spadeDist = pow(pow(sx, 1.30) + pow(sy, 1.30), 1.0 / 1.30);
 
-  // Height relief of the scale
-  float height = clamp(1.0 - diamondDist, 0.0, 1.0) * keel * arch;
+  // Longitudinal tilt: trailing caudal tip is thick and lifted above the body
+  float ramp = mix(0.18, 1.05, smoothstep(0.80, -0.65, d.y));
 
-  // Discrete scale ID for pattern and keratin variation
+  // Raised central keel ridge running down d.x = 0
+  float keel = pow(clamp(1.0 - sx, 0.0, 1.0), 0.72);
+
+  // Fleshy scale dome with elevated trailing lip
+  float dome = sqrt(clamp(1.0 - clamp(spadeDist, 0.0, 1.0) * 0.45, 0.0, 1.0));
+  float height = ramp * (0.38 + 0.62 * keel) * dome;
+
+  // Discrete scale ID for pattern and organic variance
   vec2 scaleId = vec2(floor(cu), pmod(floor(cv), PATTERN_PERIOD));
   float idHash = hash21(scaleId);
 
-  // Diamondback rattlesnake dorsal pattern:
-  // Center spine is at SCALE_COLUMNS * 0.5
+  // Dorsal Diamondback pattern envelope
   float spineDist = abs(cu - (SCALE_COLUMNS * 0.5));
   float cycleV = pmod(cv + 0.5, PATTERN_PERIOD) - (PATTERN_PERIOD * 0.5);
+  float macroPatternDist = spineDist * 1.30 + abs(cycleV);
 
-  // Macro-diamond envelope on dorsal spine repeating every 8 rows
-  float macroDiamond = spineDist * 1.35 + abs(cycleV);
-
-  return vec4(diamondDist, height, idHash, macroDiamond);
+  return vec4(spadeDist, height, idHash, macroPatternDist);
 }
 
 vec3 computeColor() {
-  // Horizontal coordinate across snake body: [-1.0 (left) to 1.0 (right)]
+  // Normalized horizontal position across snake body: [-1.0, 1.0]
   float x = (gl_FragCoord.x / u_resolution.x - 0.5) * 2.0;
 
-  // Cylindrical body curvature normal (brightest along center spine, falls off at sides)
-  float xClamped = clamp(x, -0.999, 0.999);
-  float zCyl = sqrt(max(0.001, 1.0 - xClamped * xClamped));
-  vec3 nCyl = normalize(vec3(xClamped, 0.0, zCyl));
+  // 1. TRUE 3D CYLINDRICAL FORESHORTENING:
+  // Map linear screen space x into cylindrical angle theta = asin(x / R).
+  // Near the edges (x -> +-1), du/dx increases dramatically, compressing scales horizontally!
+  float normX = clamp(x * 0.985, -0.985, 0.985);
+  float theta = asin(normX);
+  float uNorm = theta / MAX_THETA; // [-1.0, 1.0]
 
-  // Scale UV lattice coordinates:
-  // Scaled by u_resolution.x so scales stay proportional and grow on landscape
-  float u = (x * 0.5 + 0.5) * SCALE_COLUMNS;
-  float v = (gl_FragCoord.y / u_resolution.x) * SCALE_COLUMNS * 1.45 - u_time * u_speed;
+  // Cylinder surface normal matching the physical curved geometry
+  vec3 nCyl = normalize(vec3(sin(theta), 0.0, cos(theta)));
 
-  // Overlapping scale lattice:
-  // Shingles overlap downwards, so candidate rows checked from dr = 1 down to dr = -1
+  // Texture coordinates:
+  // u wraps along the cylinder perimeter (compressed at screen edges)
+  float u = (uNorm * 0.5 + 0.5) * SCALE_COLUMNS;
+  float v = (gl_FragCoord.y / u_resolution.x) * SCALE_COLUMNS * 1.55 - u_time * u_speed;
+
+  // 2. OVERLAPPING SHINGLE RESOLUTION:
+  // Snake scales overlap downwards (head tucks under, trailing tip overlaps over the scale below).
+  // Check candidates from top layer (dr = 1) down to bottom layer (dr = -1).
   float baseRow = floor(v);
-  vec4 winningScale = vec4(999.0, 0.0, 0.0, 0.0);
+  vec4 win = vec4(999.0, 0.0, 0.0, 0.0);
+  float upperLipDist = 999.0;
   bool found = false;
 
   for (int dr = 1; dr >= -1; --dr) {
@@ -127,88 +140,113 @@ vec3 computeColor() {
     float cu = floor(u - parity * 0.5) + 0.5 + parity * 0.5;
 
     vec4 s = evalScale(cu, row, u, v);
+
+    // Track distance to the upper scale's trailing edge for drop shadow
+    if (dr == 1) {
+      upperLipDist = s.x;
+    }
+
     if (s.x <= 1.0) {
-      winningScale = s;
+      win = s;
       found = true;
       break;
     }
   }
 
+  // Boundary fallback
   if (!found) {
     for (int dr = 1; dr >= -1; --dr) {
       float row = baseRow + float(dr);
       float parity = pmod(row, 2.0);
       float cu = floor(u - parity * 0.5) + 0.5 + parity * 0.5;
       vec4 s = evalScale(cu, row, u, v);
-      if (s.x < winningScale.x) {
-        winningScale = s;
+      if (s.x < win.x) {
+        win = s;
       }
     }
   }
 
-  float dist = winningScale.x;
-  float h = winningScale.y;
-  float idHash = winningScale.z;
-  float macroDist = winningScale.w;
+  float dist = win.x;
+  float h = win.y;
+  float idHash = win.z;
+  float macroDist = win.w;
 
-  // Compute scale normal from screen-space derivatives
+  // Hardware screen-space derivatives for tactile scale relief
   float dhdx = dFdx(h);
   float dhdy = dFdy(h);
   vec3 nScale = normalize(vec3(-dhdx * 28.0, -dhdy * 28.0, 1.0));
 
-  // Blend scale surface normal with cylindrical body curvature
-  vec3 N = normalize(vec3(nCyl.xy * 0.60 + nScale.xy * 0.80, nCyl.z * nScale.z));
+  // Blend scale normal with cylindrical body curvature
+  vec3 N = normalize(vec3(nCyl.xy * 0.65 + nScale.xy * 0.75, nCyl.z * nScale.z));
 
   // Lighting vectors
-  vec3 lightDir = normalize(vec3(0.0, 0.35, 0.93));
+  vec3 lightDir = normalize(vec3(0.0, 0.40, 0.91));
   vec3 viewDir = vec3(0.0, 0.0, 1.0);
   vec3 halfDir = normalize(lightDir + viewDir);
 
-  // Cylindrical diffuse falloff: brightest in center, soft shadow at edges
+  // Cylindrical diffuse falloff: brightest along the center spine
   float diff = max(dot(N, lightDir), 0.0);
-  float cylVignette = smoothstep(1.0, 0.12, abs(x));
+  float cylVignette = pow(clamp(cos(theta), 0.0, 1.0), 0.75);
 
-  // Keratin specular highlights: broad sheen plus sharp anisotropic glint along the keel
-  float specBroad = pow(max(dot(N, halfDir), 0.0), 18.0);
-  float specKeel = pow(max(dot(N, halfDir), 0.0), 55.0) * clamp(1.0 - abs(dhdx * 12.0), 0.0, 1.0);
+  // Keratin specular highlights: broad sheen plus sharp keel glint
+  float specBroad = pow(max(dot(N, halfDir), 0.0), 16.0);
+  float specKeel = pow(max(dot(N, halfDir), 0.0), 55.0) * clamp(1.0 - abs(dhdx * 10.0), 0.0, 1.0);
 
-  // Rim lighting / subtle subsurface grazing angle glow
-  float rim = pow(clamp(1.0 - max(dot(nCyl, viewDir), 0.0), 0.0, 1.0), 2.2) * 0.35;
+  // Subsurface rim lighting around curving cylinder horizon
+  float rim = pow(clamp(1.0 - max(dot(nCyl, viewDir), 0.0), 0.0, 1.0), 2.2) * 0.40;
 
-  // Reptilian color palette:
-  vec3 tanBase = vec3(0.64, 0.52, 0.35);
-  vec3 oliveBase = vec3(0.50, 0.44, 0.30);
-  vec3 scaleColor = mix(tanBase, oliveBase, idHash * 0.7);
+  // 3. COLOR PALETTE (matching reference snake photo):
+  // - Rich luminous ivory / butter-yellow
+  // - Deep pitch charcoal / espresso
+  // - Warm caramel-ochre midtones
+  vec3 butterCream = vec3(0.93, 0.86, 0.62);
+  vec3 darkCharcoal = vec3(0.12, 0.10, 0.08);
+  vec3 warmOchre = vec3(0.62, 0.50, 0.33);
+  vec3 oliveTan = vec3(0.48, 0.42, 0.28);
 
-  // Diamondback markings:
-  vec3 darkMarking = vec3(0.13, 0.10, 0.07);
-  vec3 creamHighlight = vec3(0.85, 0.80, 0.66);
-  vec3 diamondCenter = vec3(0.58, 0.46, 0.31);
+  vec3 baseTone = mix(warmOchre, oliveTan, idHash * 0.65);
+  vec3 scaleColor = baseTone;
 
-  if (macroDist < 1.9) {
-    scaleColor = mix(scaleColor, diamondCenter, 0.65);
-  } else if (macroDist >= 1.9 && macroDist < 3.1) {
-    scaleColor = mix(scaleColor, darkMarking, 0.88);
-  } else if (macroDist >= 3.1 && macroDist < 4.1) {
-    scaleColor = mix(scaleColor, creamHighlight, 0.82);
+  // Diamondback rattlesnake markings:
+  if (macroDist < 2.0) {
+    // Diamond center
+    scaleColor = mix(scaleColor, butterCream, 0.85);
+  } else if (macroDist >= 2.0 && macroDist < 3.3) {
+    // Bold dark diamond border
+    scaleColor = mix(scaleColor, darkCharcoal, 0.90);
+  } else if (macroDist >= 3.3 && macroDist < 4.4) {
+    // Pale outer halo
+    scaleColor = mix(scaleColor, butterCream, 0.75);
   }
 
-  // Micro-keratin shade variation per scale
-  scaleColor *= (0.88 + 0.24 * idHash);
+  // Micro-organic scale tint variance
+  scaleColor *= (0.86 + 0.28 * idHash);
 
-  // Scale depth & ambient occlusion crevices between overlapping shingles
-  float edgeAO = smoothstep(0.0, 0.18, 1.0 - dist) * (0.55 + 0.45 * cylVignette);
+  // Highlight along the thick trailing lip of each scale
+  float lipHighlight = smoothstep(0.80, 0.98, dist) * (1.0 - smoothstep(0.98, 1.02, dist));
+  scaleColor = mix(scaleColor, butterCream * 1.15, lipHighlight * 0.35);
+
+  // 4. OVERLAPPING CONTACT DROP SHADOW:
+  // The upper scale lifts off and casts a soft drop shadow on the scale underneath
+  float dropShadow = 1.0;
+  if (upperLipDist > 1.0 && upperLipDist < 1.35) {
+    dropShadow = smoothstep(1.0, 1.35, upperLipDist);
+    dropShadow = mix(0.38, 1.0, dropShadow);
+  }
+
+  // Ambient occlusion crevice shadow at scale boundaries
+  float edgeAO = smoothstep(0.0, 0.22, 1.0 - dist);
 
   // Combine ambient, diffuse, specular, and rim
-  vec3 ambient = scaleColor * 0.28 * (0.3 + 0.7 * cylVignette);
-  vec3 diffuse = scaleColor * diff * (0.35 + 0.65 * cylVignette);
-  vec3 specular = vec3(1.0, 0.96, 0.88) * (specBroad * 0.35 + specKeel * 0.45) * cylVignette;
-  vec3 rimLight = vec3(0.38, 0.34, 0.26) * rim;
+  vec3 ambient = scaleColor * 0.26 * (0.25 + 0.75 * cylVignette);
+  vec3 diffuse = scaleColor * diff * (0.30 + 0.70 * cylVignette);
+  vec3 specular = vec3(1.0, 0.96, 0.88) * (specBroad * 0.32 + specKeel * 0.45) * cylVignette;
+  vec3 rimLight = vec3(0.42, 0.36, 0.26) * rim;
 
-  vec3 finalColor = (ambient + diffuse) * edgeAO + specular + rimLight;
+  vec3 finalColor = (ambient + diffuse) * edgeAO * dropShadow + specular + rimLight;
 
-  // Tone mapping and gamma curve for rich contrast
-  return finalColor / (finalColor + vec3(0.80)) * 1.80;
+  // Film-like tone curve
+  return finalColor / (finalColor + vec3(0.78)) * 1.78;
 }
 `;
 
@@ -290,7 +328,7 @@ const resLoc = gl.getUniformLocation(program, 'u_resolution');
 const timeLoc = gl.getUniformLocation(program, 'u_time');
 const speedLoc = gl.getUniformLocation(program, 'u_speed');
 
-const CRAWL_SPEED = 1.2;
+const CRAWL_SPEED = 1.15;
 
 function handleResize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2.0);
@@ -365,6 +403,6 @@ if (new URLSearchParams(window.location.search).has('snap')) {
     img.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:999999;display:block;object-fit:cover;';
     document.body.appendChild(img);
   } catch (e) {
-    if (typeof dump === 'function') dump('toDataURL error: ' + e + '\n');
+    // ignore
   }
 }
