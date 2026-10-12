@@ -54,8 +54,8 @@ uniform float u_speed;
 // Mathematical period of dorsal pattern in scale rows (even for staggered lattice)
 const float PATTERN_PERIOD = 8.0;
 
-// Total scale columns mapped across the visible cylindrical perimeter
-const float SCALE_COLUMNS = 18.0;
+// Total scale columns mapped across the visible cylindrical perimeter (doubled scale size)
+const float SCALE_COLUMNS = 9.0;
 
 // Maximum cylinder wrap angle (radians, ~82 degrees for steep edge curving)
 const float MAX_THETA = 1.44;
@@ -99,10 +99,10 @@ vec4 evalScale(float cu, float cv, float u, float v) {
   vec2 scaleId = vec2(floor(cu), pmod(floor(cv), PATTERN_PERIOD));
   float idHash = hash21(scaleId);
 
-  // Dorsal Diamondback pattern envelope
+  // Dorsal Diamondback pattern envelope calibrated for 2x scale size
   float spineDist = abs(cu - (SCALE_COLUMNS * 0.5));
   float cycleV = pmod(cv + 0.5, PATTERN_PERIOD) - (PATTERN_PERIOD * 0.5);
-  float macroPatternDist = spineDist * 1.30 + abs(cycleV);
+  float macroPatternDist = spineDist * 1.25 + abs(cycleV);
 
   return vec4(spadeDist, height, idHash, macroPatternDist);
 }
@@ -207,14 +207,14 @@ vec3 computeColor() {
   vec3 baseTone = mix(warmOchre, oliveTan, idHash * 0.65);
   vec3 scaleColor = baseTone;
 
-  // Diamondback rattlesnake markings:
-  if (macroDist < 2.0) {
+  // Diamondback rattlesnake markings (calibrated for doubled scale size):
+  if (macroDist < 1.4) {
     // Diamond center
     scaleColor = mix(scaleColor, butterCream, 0.85);
-  } else if (macroDist >= 2.0 && macroDist < 3.3) {
+  } else if (macroDist >= 1.4 && macroDist < 2.6) {
     // Bold dark diamond border
     scaleColor = mix(scaleColor, darkCharcoal, 0.90);
-  } else if (macroDist >= 3.3 && macroDist < 4.4) {
+  } else if (macroDist >= 2.6 && macroDist < 3.6) {
     // Pale outer halo
     scaleColor = mix(scaleColor, butterCream, 0.75);
   }
@@ -229,9 +229,9 @@ vec3 computeColor() {
   // 4. OVERLAPPING CONTACT DROP SHADOW:
   // The upper scale lifts off and casts a soft drop shadow on the scale underneath
   float dropShadow = 1.0;
-  if (upperLipDist > 1.0 && upperLipDist < 1.35) {
-    dropShadow = smoothstep(1.0, 1.35, upperLipDist);
-    dropShadow = mix(0.38, 1.0, dropShadow);
+  if (upperLipDist > 1.0 && upperLipDist < 1.45) {
+    dropShadow = smoothstep(1.0, 1.45, upperLipDist);
+    dropShadow = mix(0.35, 1.0, dropShadow);
   }
 
   // Ambient occlusion crevice shadow at scale boundaries
@@ -328,7 +328,7 @@ const resLoc = gl.getUniformLocation(program, 'u_resolution');
 const timeLoc = gl.getUniformLocation(program, 'u_time');
 const speedLoc = gl.getUniformLocation(program, 'u_speed');
 
-const CRAWL_SPEED = 1.15;
+const CRAWL_SPEED = 0.85;
 
 function handleResize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2.0);
