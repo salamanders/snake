@@ -1,6 +1,53 @@
-// WebGL2 & WebGL1 Compatible Full-Screen Snake Back Animation
-// Realistic Keeled Overlapping Scales with 3D Cylindrical Foreshortening
-// Pure Vanilla ES Module - Zero Dependencies
+// =============================================================================
+// SNAKE ANIMATION CONFIGURATION
+// Tweak any of these constants to adjust scales, movement, colors, and lighting
+// =============================================================================
+
+export const CONFIG = {
+  // Scale Geometry & Density
+  scaleColumns: 9.0,          // Scales across cylinder perimeter (lower = larger scales)
+  scaleAspect: 1.55,           // Vertical scale stretch factor (higher = longer scales)
+  patternPeriod: 8.0,          // Repeat cycle for dorsal diamond pattern in rows
+  crawlSpeed: 0.85,            // Steady upward crawl speed (scale units per second)
+
+  // 3D Cylindrical Foreshortening
+  maxTheta: 1.44,              // Horizon curvature wrapping angle (radians, ~82 deg)
+  cylinderFalloffExp: 0.75,    // Edge vignette falloff exponent (higher = darker sides)
+
+  // Scale Relief & Shingling Mechanics
+  scaleContourPower: 1.30,     // Contour shape exponent (1.0 = diamond, 2.0 = ellipse)
+  keelSharpness: 0.72,         // Keel ridge exponent (smaller = sharper central spine)
+  reliefDepth: 28.0,           // Normal map depth multiplier from screen derivatives
+  dropShadowStrength: 0.65,    // Contact drop shadow darkness under lifted trailing lip
+  lipHighlightStrength: 0.35,  // Specular sheen along trailing rounded edge of scale
+
+  // Lighting & Keratin Specular
+  lightDir: [0.0, 0.40, 0.91], // Normalized overhead key light direction [X, Y, Z]
+  ambientStrength: 0.26,       // Ambient base fill lighting
+  diffuseStrength: 1.0,        // Directional diffuse multiplier
+  specularBroadExp: 16.0,      // Broad waxy sheen shininess exponent
+  specularBroadStrength: 0.32, // Broad sheen intensity
+  specularKeelExp: 55.0,       // Sharp anisotropic keel glint exponent
+  specularKeelStrength: 0.45,  // Sharp keel glint intensity
+  rimLightStrength: 0.40,      // Grazing angle subsurface glow at cylinder horizon
+
+  // Color Palette (RGB normalized 0.0 - 1.0)
+  colorButterCream: [0.93, 0.86, 0.62], // Pale ivory / butter-yellow markings
+  colorDarkCharcoal: [0.12, 0.10, 0.08], // Deep espresso / charcoal diamond borders
+  colorWarmOchre: [0.62, 0.50, 0.33],    // Warm amber / buff body scales
+  colorOliveTan: [0.48, 0.42, 0.28],     // Muted olive-tan flank scale variation
+
+  // Performance
+  maxDpr: 2.0                  // Maximum devicePixelRatio cap (prevents mobile GPU throttling)
+};
+
+// GLSL formatting helpers
+const f = (n) => Number(n).toFixed(4);
+const v3 = (arr) => `vec3(${f(arr[0])}, ${f(arr[1])}, ${f(arr[2])})`;
+
+// =============================================================================
+// WEBGL ENGINE INITIALIZATION
+// =============================================================================
 
 const canvas = document.getElementById('canvas');
 const contextOptions = {
@@ -45,20 +92,35 @@ void main() {
 }
 `;
 
-// Shared fragment shader body
+// Shared fragment shader body with injected constants
 const shaderCore = `
 uniform vec2 u_resolution;
 uniform float u_time;
 uniform float u_speed;
 
-// Mathematical period of dorsal pattern in scale rows (even for staggered lattice)
-const float PATTERN_PERIOD = 8.0;
-
-// Total scale columns mapped across the visible cylindrical perimeter (doubled scale size)
-const float SCALE_COLUMNS = 9.0;
-
-// Maximum cylinder wrap angle (radians, ~82 degrees for steep edge curving)
-const float MAX_THETA = 1.44;
+// Injected configuration constants
+const float PATTERN_PERIOD = ${f(CONFIG.patternPeriod)};
+const float SCALE_COLUMNS = ${f(CONFIG.scaleColumns)};
+const float SCALE_ASPECT = ${f(CONFIG.scaleAspect)};
+const float MAX_THETA = ${f(CONFIG.maxTheta)};
+const float CYL_FALLOFF_EXP = ${f(CONFIG.cylinderFalloffExp)};
+const float CONTOUR_POW = ${f(CONFIG.scaleContourPower)};
+const float KEEL_SHARPNESS = ${f(CONFIG.keelSharpness)};
+const float RELIEF_DEPTH = ${f(CONFIG.reliefDepth)};
+const float DROP_SHADOW_STR = ${f(CONFIG.dropShadowStrength)};
+const float LIP_HIGHLIGHT_STR = ${f(CONFIG.lipHighlightStrength)};
+const vec3 LIGHT_DIR = normalize(${v3(CONFIG.lightDir)});
+const float AMBIENT_STR = ${f(CONFIG.ambientStrength)};
+const float DIFFUSE_STR = ${f(CONFIG.diffuseStrength)};
+const float SPEC_BROAD_EXP = ${f(CONFIG.specularBroadExp)};
+const float SPEC_BROAD_STR = ${f(CONFIG.specularBroadStrength)};
+const float SPEC_KEEL_EXP = ${f(CONFIG.specularKeelExp)};
+const float SPEC_KEEL_STR = ${f(CONFIG.specularKeelStrength)};
+const float RIM_STR = ${f(CONFIG.rimLightStrength)};
+const vec3 COLOR_BUTTER_CREAM = ${v3(CONFIG.colorButterCream)};
+const vec3 COLOR_DARK_CHARCOAL = ${v3(CONFIG.colorDarkCharcoal)};
+const vec3 COLOR_WARM_OCHRE = ${v3(CONFIG.colorWarmOchre)};
+const vec3 COLOR_OLIVE_TAN = ${v3(CONFIG.colorOliveTan)};
 
 float pmod(float val, float m) {
   return mod(mod(val, m) + m, m);
@@ -83,13 +145,13 @@ vec4 evalScale(float cu, float cv, float u, float v) {
   float sy = d.y < 0.0 ? abs(d.y) / 0.98 : d.y / 0.82;
 
   // Lanceolate spade contour: blend between rounded diamond and ovate petal
-  float spadeDist = pow(pow(sx, 1.30) + pow(sy, 1.30), 1.0 / 1.30);
+  float spadeDist = pow(pow(sx, CONTOUR_POW) + pow(sy, CONTOUR_POW), 1.0 / CONTOUR_POW);
 
   // Longitudinal tilt: trailing caudal tip is thick and lifted above the body
   float ramp = mix(0.18, 1.05, smoothstep(0.80, -0.65, d.y));
 
   // Raised central keel ridge running down d.x = 0
-  float keel = pow(clamp(1.0 - sx, 0.0, 1.0), 0.72);
+  float keel = pow(clamp(1.0 - sx, 0.0, 1.0), KEEL_SHARPNESS);
 
   // Fleshy scale dome with elevated trailing lip
   float dome = sqrt(clamp(1.0 - clamp(spadeDist, 0.0, 1.0) * 0.45, 0.0, 1.0));
@@ -99,7 +161,7 @@ vec4 evalScale(float cu, float cv, float u, float v) {
   vec2 scaleId = vec2(floor(cu), pmod(floor(cv), PATTERN_PERIOD));
   float idHash = hash21(scaleId);
 
-  // Dorsal Diamondback pattern envelope calibrated for 2x scale size
+  // Dorsal Diamondback pattern envelope calibrated for scale density
   float spineDist = abs(cu - (SCALE_COLUMNS * 0.5));
   float cycleV = pmod(cv + 0.5, PATTERN_PERIOD) - (PATTERN_PERIOD * 0.5);
   float macroPatternDist = spineDist * 1.25 + abs(cycleV);
@@ -124,7 +186,7 @@ vec3 computeColor() {
   // Texture coordinates:
   // u wraps along the cylinder perimeter (compressed at screen edges)
   float u = (uNorm * 0.5 + 0.5) * SCALE_COLUMNS;
-  float v = (gl_FragCoord.y / u_resolution.x) * SCALE_COLUMNS * 1.55 - u_time * u_speed;
+  float v = (gl_FragCoord.y / u_resolution.x) * SCALE_COLUMNS * SCALE_ASPECT - u_time * u_speed;
 
   // 2. OVERLAPPING SHINGLE RESOLUTION:
   // Snake scales overlap downwards (head tucks under, trailing tip overlaps over the scale below).
@@ -174,49 +236,37 @@ vec3 computeColor() {
   // Hardware screen-space derivatives for tactile scale relief
   float dhdx = dFdx(h);
   float dhdy = dFdy(h);
-  vec3 nScale = normalize(vec3(-dhdx * 28.0, -dhdy * 28.0, 1.0));
+  vec3 nScale = normalize(vec3(-dhdx * RELIEF_DEPTH, -dhdy * RELIEF_DEPTH, 1.0));
 
   // Blend scale normal with cylindrical body curvature
   vec3 N = normalize(vec3(nCyl.xy * 0.65 + nScale.xy * 0.75, nCyl.z * nScale.z));
 
   // Lighting vectors
-  vec3 lightDir = normalize(vec3(0.0, 0.40, 0.91));
   vec3 viewDir = vec3(0.0, 0.0, 1.0);
-  vec3 halfDir = normalize(lightDir + viewDir);
+  vec3 halfDir = normalize(LIGHT_DIR + viewDir);
 
   // Cylindrical diffuse falloff: brightest along the center spine
-  float diff = max(dot(N, lightDir), 0.0);
-  float cylVignette = pow(clamp(cos(theta), 0.0, 1.0), 0.75);
+  float diff = max(dot(N, LIGHT_DIR), 0.0);
+  float cylVignette = pow(clamp(cos(theta), 0.0, 1.0), CYL_FALLOFF_EXP);
 
   // Keratin specular highlights: broad sheen plus sharp keel glint
-  float specBroad = pow(max(dot(N, halfDir), 0.0), 16.0);
-  float specKeel = pow(max(dot(N, halfDir), 0.0), 55.0) * clamp(1.0 - abs(dhdx * 10.0), 0.0, 1.0);
+  float specBroad = pow(max(dot(N, halfDir), 0.0), SPEC_BROAD_EXP);
+  float specKeel = pow(max(dot(N, halfDir), 0.0), SPEC_KEEL_EXP) * clamp(1.0 - abs(dhdx * 10.0), 0.0, 1.0);
 
   // Subsurface rim lighting around curving cylinder horizon
-  float rim = pow(clamp(1.0 - max(dot(nCyl, viewDir), 0.0), 0.0, 1.0), 2.2) * 0.40;
+  float rim = pow(clamp(1.0 - max(dot(nCyl, viewDir), 0.0), 0.0, 1.0), 2.2) * RIM_STR;
 
-  // 3. COLOR PALETTE (matching reference snake photo):
-  // - Rich luminous ivory / butter-yellow
-  // - Deep pitch charcoal / espresso
-  // - Warm caramel-ochre midtones
-  vec3 butterCream = vec3(0.93, 0.86, 0.62);
-  vec3 darkCharcoal = vec3(0.12, 0.10, 0.08);
-  vec3 warmOchre = vec3(0.62, 0.50, 0.33);
-  vec3 oliveTan = vec3(0.48, 0.42, 0.28);
-
-  vec3 baseTone = mix(warmOchre, oliveTan, idHash * 0.65);
+  // 3. COLOR PALETTE:
+  vec3 baseTone = mix(COLOR_WARM_OCHRE, COLOR_OLIVE_TAN, idHash * 0.65);
   vec3 scaleColor = baseTone;
 
-  // Diamondback rattlesnake markings (calibrated for doubled scale size):
+  // Diamondback rattlesnake markings:
   if (macroDist < 1.4) {
-    // Diamond center
-    scaleColor = mix(scaleColor, butterCream, 0.85);
+    scaleColor = mix(scaleColor, COLOR_BUTTER_CREAM, 0.85);
   } else if (macroDist >= 1.4 && macroDist < 2.6) {
-    // Bold dark diamond border
-    scaleColor = mix(scaleColor, darkCharcoal, 0.90);
+    scaleColor = mix(scaleColor, COLOR_DARK_CHARCOAL, 0.90);
   } else if (macroDist >= 2.6 && macroDist < 3.6) {
-    // Pale outer halo
-    scaleColor = mix(scaleColor, butterCream, 0.75);
+    scaleColor = mix(scaleColor, COLOR_BUTTER_CREAM, 0.75);
   }
 
   // Micro-organic scale tint variance
@@ -224,23 +274,23 @@ vec3 computeColor() {
 
   // Highlight along the thick trailing lip of each scale
   float lipHighlight = smoothstep(0.80, 0.98, dist) * (1.0 - smoothstep(0.98, 1.02, dist));
-  scaleColor = mix(scaleColor, butterCream * 1.15, lipHighlight * 0.35);
+  scaleColor = mix(scaleColor, COLOR_BUTTER_CREAM * 1.15, lipHighlight * LIP_HIGHLIGHT_STR);
 
   // 4. OVERLAPPING CONTACT DROP SHADOW:
   // The upper scale lifts off and casts a soft drop shadow on the scale underneath
   float dropShadow = 1.0;
   if (upperLipDist > 1.0 && upperLipDist < 1.45) {
     dropShadow = smoothstep(1.0, 1.45, upperLipDist);
-    dropShadow = mix(0.35, 1.0, dropShadow);
+    dropShadow = mix(1.0 - DROP_SHADOW_STR, 1.0, dropShadow);
   }
 
   // Ambient occlusion crevice shadow at scale boundaries
   float edgeAO = smoothstep(0.0, 0.22, 1.0 - dist);
 
   // Combine ambient, diffuse, specular, and rim
-  vec3 ambient = scaleColor * 0.26 * (0.25 + 0.75 * cylVignette);
-  vec3 diffuse = scaleColor * diff * (0.30 + 0.70 * cylVignette);
-  vec3 specular = vec3(1.0, 0.96, 0.88) * (specBroad * 0.32 + specKeel * 0.45) * cylVignette;
+  vec3 ambient = scaleColor * AMBIENT_STR * (0.25 + 0.75 * cylVignette);
+  vec3 diffuse = scaleColor * diff * DIFFUSE_STR * (0.30 + 0.70 * cylVignette);
+  vec3 specular = vec3(1.0, 0.96, 0.88) * (specBroad * SPEC_BROAD_STR + specKeel * SPEC_KEEL_STR) * cylVignette;
   vec3 rimLight = vec3(0.42, 0.36, 0.26) * rim;
 
   vec3 finalColor = (ambient + diffuse) * edgeAO * dropShadow + specular + rimLight;
@@ -328,10 +378,8 @@ const resLoc = gl.getUniformLocation(program, 'u_resolution');
 const timeLoc = gl.getUniformLocation(program, 'u_time');
 const speedLoc = gl.getUniformLocation(program, 'u_speed');
 
-const CRAWL_SPEED = 0.85;
-
 function handleResize() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2.0);
+  const dpr = Math.min(window.devicePixelRatio || 1, CONFIG.maxDpr);
   const width = Math.round(window.innerWidth * dpr);
   const height = Math.round(window.innerHeight * dpr);
 
@@ -384,7 +432,7 @@ function render() {
 
   gl.uniform2f(resLoc, canvas.width, canvas.height);
   gl.uniform1f(timeLoc, currentTime);
-  gl.uniform1f(speedLoc, CRAWL_SPEED);
+  gl.uniform1f(speedLoc, CONFIG.crawlSpeed);
 
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
