@@ -5,40 +5,63 @@
 
 export const CONFIG = {
   // Scale Geometry & Density
-  scaleColumns: 10.0,          // Scales across cylinder perimeter (lower = larger scales)
-  scaleAspect: 1.55,           // Vertical scale stretch factor (higher = longer scales)
-  patternPeriod: 8.0,          // Repeat cycle for dorsal diamond pattern in rows
-  crawlSpeed: 0.95,            // Steady upward crawl speed (scale units per second)
+  scaleColumns: 10.0,          // [min: 4.0, max: 24.0] Scales across body (lower = larger scales)
+  scaleAspect: 1.55,           // [min: 0.6, max: 3.0]  Vertical stretch factor (higher = longer scales)
+  patternPeriod: 8.0,          // [min: 2.0, max: 16.0] Repeat cycle in rows (must be an even integer)
+  crawlSpeed: 0.95,            // [min: -3.0, max: 4.0] Upward speed in scale units/sec (negative = crawls down)
 
   // 3D Cylindrical Foreshortening
-  maxTheta: 1.44,              // Horizon curvature wrapping angle (radians, ~82 deg)
-  cylinderFalloffExp: 0.80,    // Edge vignette falloff exponent (higher = darker sides)
+  maxTheta: 1.44,              // [min: 0.20, max: 1.54] Curvature wrap angle in radians (higher = steeper edge curving)
+  cylinderFalloffExp: 0.80,    // [min: 0.10, max: 2.50] Edge vignette falloff exponent (higher = darker sides)
 
   // Scale Relief & Shingling Mechanics
-  scaleContourPower: 1.30,     // Contour shape exponent (1.0 = diamond, 2.0 = ellipse)
-  keelSharpness: 0.72,         // Keel ridge exponent (smaller = sharper central spine)
-  reliefDepth: 28.0,           // Normal map depth multiplier from screen derivatives
-  dropShadowStrength: 0.65,    // Contact drop shadow darkness under lifted trailing lip
-  lipHighlightStrength: 0.35,  // Specular sheen along trailing rounded edge of scale
+  scaleContourPower: 1.30,     // [min: 0.80, max: 2.50] Shape contour exponent (0.8 = sharp diamond, 2.0 = rounded oval)
+  keelSharpness: 0.72,         // [min: 0.30, max: 1.50] Keel ridge exponent (smaller = sharper central ridge)
+  reliefDepth: 28.0,           // [min: 0.00, max: 60.0] Normal depth from surface derivatives (0 = flat 2D)
+  dropShadowStrength: 0.65,    // [min: 0.00, max: 1.00] Darkness of contact drop shadow under trailing lip
+  lipHighlightStrength: 0.35,  // [min: 0.00, max: 1.00] Brightness of highlight on trailing edge
 
   // Lighting & Keratin Specular
-  lightDir: [0.0, 0.40, 0.91], // Normalized overhead key light direction [X, Y, Z]
-  ambientStrength: 0.26,       // Ambient base fill lighting
-  diffuseStrength: 1.0,        // Directional diffuse multiplier
-  specularBroadExp: 16.0,      // Broad waxy sheen shininess exponent
-  specularBroadStrength: 0.32, // Broad sheen intensity
-  specularKeelExp: 55.0,       // Sharp anisotropic keel glint exponent
-  specularKeelStrength: 0.45,  // Sharp keel glint intensity
-  rimLightStrength: 0.40,      // Grazing angle subsurface glow at cylinder horizon
+  lightDir: [0.0, 0.40, 0.91], // [X: -1 to 1, Y: -1 to 1, Z: 0.1 to 1] Overhead key light direction vector
+  ambientStrength: 0.26,       // [min: 0.00, max: 1.00] Base ambient fill lighting
+  diffuseStrength: 1.0,        // [min: 0.00, max: 2.00] Directional diffuse multiplier
+  specularBroadExp: 16.0,      // [min: 2.00, max: 64.0] Broad waxy sheen exponent (higher = tighter sheen)
+  specularBroadStrength: 0.32, // [min: 0.00, max: 1.00] Broad sheen intensity
+  specularKeelExp: 55.0,       // [min: 10.0, max: 120.] Sharp keel glint exponent (higher = pinpoint glint)
+  specularKeelStrength: 0.45,  // [min: 0.00, max: 1.00] Sharp keel glint intensity
+  rimLightStrength: 0.40,      // [min: 0.00, max: 1.00] Subsurface rim glow at cylinder edges
 
-  // Color Palette (RGB normalized 0.0 - 1.0)
-  colorButterCream: [0.93, 0.86, 0.62], // Pale ivory / butter-yellow markings
-  colorDarkCharcoal: [0.12, 0.10, 0.08], // Deep espresso / charcoal diamond borders
-  colorWarmOchre: [0.62, 0.50, 0.33],    // Warm amber / buff body scales
-  colorOliveTan: [0.48, 0.42, 0.28],     // Muted olive-tan flank scale variation
+  // Color Palette (RGB normalized [0.0 - 1.0])
+  colorButterCream: [0.93, 0.86, 0.62], // [0-1, 0-1, 0-1] Pale ivory / butter-yellow markings
+  colorDarkCharcoal: [0.12, 0.10, 0.08], // [0-1, 0-1, 0-1] Deep espresso / charcoal diamond borders
+  colorWarmOchre: [0.62, 0.50, 0.33],    // [0-1, 0-1, 0-1] Warm amber / buff body scales
+  colorOliveTan: [0.48, 0.42, 0.28],     // [0-1, 0-1, 0-1] Muted olive-tan flank scale variation
 
   // Performance
-  maxDpr: 2.0                  // Maximum devicePixelRatio cap (prevents mobile GPU throttling)
+  maxDpr: 2.0                  // [min: 1.00, max: 3.00] Maximum devicePixelRatio cap (prevents mobile GPU throttling)
+};
+
+// Programmatic min/max bounds and step increments for UI / controllers
+export const CONFIG_BOUNDS = {
+  scaleColumns: { min: 4.0, max: 24.0, step: 0.5 },
+  scaleAspect: { min: 0.6, max: 3.0, step: 0.05 },
+  patternPeriod: { min: 2.0, max: 16.0, step: 2.0 },
+  crawlSpeed: { min: -3.0, max: 4.0, step: 0.05 },
+  maxTheta: { min: 0.20, max: 1.54, step: 0.02 },
+  cylinderFalloffExp: { min: 0.10, max: 2.50, step: 0.05 },
+  scaleContourPower: { min: 0.80, max: 2.50, step: 0.05 },
+  keelSharpness: { min: 0.30, max: 1.50, step: 0.02 },
+  reliefDepth: { min: 0.0, max: 60.0, step: 1.0 },
+  dropShadowStrength: { min: 0.0, max: 1.0, step: 0.05 },
+  lipHighlightStrength: { min: 0.0, max: 1.0, step: 0.05 },
+  ambientStrength: { min: 0.0, max: 1.0, step: 0.02 },
+  diffuseStrength: { min: 0.0, max: 2.0, step: 0.05 },
+  specularBroadExp: { min: 2.0, max: 64.0, step: 1.0 },
+  specularBroadStrength: { min: 0.0, max: 1.0, step: 0.02 },
+  specularKeelExp: { min: 10.0, max: 120.0, step: 5.0 },
+  specularKeelStrength: { min: 0.0, max: 1.0, step: 0.02 },
+  rimLightStrength: { min: 0.0, max: 1.0, step: 0.02 },
+  maxDpr: { min: 1.0, max: 3.0, step: 0.25 }
 };
 
 // GLSL formatting helpers
