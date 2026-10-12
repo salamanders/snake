@@ -15,28 +15,28 @@ export const CONFIG = {
   // ---------------------------------------------------------------------------
   // 2. SCALE OVERLAP & 3D RELIEF
   // ---------------------------------------------------------------------------
-  scaleOverlap: 0.40,          // [min: 0.05, max: 0.80] Shingle overlap. Higher = scales cover more of the scale below. Lower = less coverage.
-  lipLiftHeight: 0.35,         // [min: 0.05, max: 0.80] Scale tip height. Higher = tip lifts higher off the body. Lower = flatter surface.
-  dropShadowStrength: 0.65,    // [min: 0.0, max: 1.0]  Shadow darkness under the scale tip. Higher = black shadow. Lower = faint shadow.
-  reliefDepth: 28.0,           // [min: 0.0, max: 60.0] 3D bump strength. Higher = deep 3D bumps. Lower = flat 2D look (0 is completely flat).
+  scaleOverlap: 0.40,          // [min: 0.0, max: 0.80] Shingle overlap. 0.0 = edges touch without overlap. 0.80 = deep heavy overlap.
+  lipLiftHeight: 0.35,         // [min: 0.0, max: 0.80] Scale tip height. 0.0 = completely flush with body. 0.80 = thick raised 3D step.
+  dropShadowStrength: 0.65,    // [min: 0.0, max: 1.0]  Shadow darkness under the scale tip. 0.0 = no shadow. 1.0 = pure black shadow.
+  reliefDepth: 28.0,           // [min: 0.0, max: 60.0] 3D bump strength. 0.0 = completely flat 2D. 60.0 = deep textured 3D bumps.
 
   // ---------------------------------------------------------------------------
   // 3. GLEAM & SPECULAR SHINE
   // ---------------------------------------------------------------------------
-  gleamOverall: 1.0,           // [min: 0.0, max: 2.5]  Master shine control. Higher = wet and shiny. Lower = dull matte (0 turns off shine).
-  gleamSpineStrength: 0.45,    // [min: 0.0, max: 1.5]  Spine gleam brightness. Higher = bright light streak along center. Lower = dim streak.
+  gleamOverall: 1.0,           // [min: 0.0, max: 2.5]  Master shine control. 0.0 = completely matte (no shine). 2.5 = intense wet shine.
+  gleamSpineStrength: 0.45,    // [min: 0.0, max: 1.5]  Spine gleam brightness. 0.0 = no light streak. 1.5 = blazing bright streak.
   gleamSpineTightness: 55.0,   // [min: 10., max: 120.] Spine gleam size. Higher = narrow sharp streak. Lower = wide soft highlight.
-  gleamSheenStrength: 0.32,    // [min: 0.0, max: 1.5]  Body sheen brightness. Higher = glossy polish over scale body. Lower = dry matte.
+  gleamSheenStrength: 0.32,    // [min: 0.0, max: 1.5]  Body sheen brightness. 0.0 = dry matte. 1.5 = high-gloss waxy polish.
   gleamSheenTightness: 16.0,   // [min: 2.0, max: 64.0] Body sheen area. Higher = small tight shine spot. Lower = wide soft waxy sheen.
-  gleamLipHighlight: 0.35,     // [min: 0.0, max: 1.5]  Rim edge gleam. Higher = glowing outline on scale bottom edge. Lower = no edge light.
+  gleamLipHighlight: 0.35,     // [min: 0.0, max: 1.5]  Rim edge gleam. 0.0 = no rim light. 1.5 = glowing outline on scale bottom edge.
 
   // ---------------------------------------------------------------------------
   // 4. MOTION & CURVATURE
   // ---------------------------------------------------------------------------
-  crawlSpeed: 0.95,            // [min: -3.0, max: 4.0] Crawl speed. Positive = crawls up. Negative = crawls down. 0 = pause.
+  crawlSpeed: 0.95,            // [min: -3.0, max: 4.0] Crawl speed. Positive = crawls up. Negative = crawls down. 0.0 = paused.
   patternPeriod: 8.0,          // [min: 2.0, max: 16.0] Diamond pattern repeat rows. Must be an even whole number.
   maxTheta: 1.44,              // [min: 0.2, max: 1.54] Body roundness. Higher = sides curve sharply away from camera. Lower = flat back.
-  cylinderFalloffExp: 0.80,    // [min: 0.1, max: 2.5]  Edge shadow darkness. Higher = dark black edges. Lower = evenly lit edges.
+  cylinderFalloffExp: 0.80,    // [min: 0.0, max: 3.5]  Edge shadow darkness. 0.0 = no shadow (evenly lit). 3.5 = pure black edges.
 
   // ---------------------------------------------------------------------------
   // 5. LIGHTING & ENVIRONMENT
@@ -314,9 +314,10 @@ vec3 computeColor() {
   vec3 viewDir = vec3(0.0, 0.0, 1.0);
   vec3 halfDir = normalize(LIGHT_DIR + viewDir);
 
-  // Cylindrical diffuse falloff: brightest along the center spine
+  // Cylindrical diffuse falloff: strictly 1.0 at center, strictly 0.0 at outer edge
   float diff = max(dot(N, LIGHT_DIR), 0.0);
-  float cylVignette = pow(clamp(cos(theta), 0.0, 1.0), CYL_FALLOFF_EXP);
+  float edgeFade = clamp((cos(theta) - cos(MAX_THETA)) / (1.0 - cos(MAX_THETA)), 0.0, 1.0);
+  float cylVignette = pow(edgeFade, CYL_FALLOFF_EXP);
 
   // 3. GLEAM & KERATIN SPECULAR HIGHLIGHTS:
   float specBroad = pow(max(dot(N, halfDir), 0.0), GLEAM_SHEEN_TIGHTNESS);
@@ -358,9 +359,10 @@ vec3 computeColor() {
   float edgeAO = smoothstep(0.0, 0.22, 1.0 - dist);
 
   // Combine ambient, diffuse, specular, and rim
-  vec3 ambient = scaleColor * AMBIENT_STR * (0.25 + 0.75 * cylVignette);
-  vec3 diffuse = scaleColor * diff * DIFFUSE_STR * (0.30 + 0.70 * cylVignette);
-  vec3 rimLight = vec3(0.42, 0.36, 0.26) * rim;
+  // When CYL_FALLOFF_EXP is high, cylVignette reaches 0.0 and edges become completely black
+  vec3 ambient = scaleColor * AMBIENT_STR * cylVignette;
+  vec3 diffuse = scaleColor * diff * DIFFUSE_STR * cylVignette;
+  vec3 rimLight = vec3(0.42, 0.36, 0.26) * rim * min(1.0, cylVignette * 1.5);
 
   vec3 finalColor = (ambient + diffuse) * edgeAO * dropShadow + specular + rimLight;
 
