@@ -5,14 +5,14 @@
 
 export const CONFIG = {
   // Scale Geometry & Density
-  scaleColumns: 9.0,          // Scales across cylinder perimeter (lower = larger scales)
+  scaleColumns: 10.0,          // Scales across cylinder perimeter (lower = larger scales)
   scaleAspect: 1.55,           // Vertical scale stretch factor (higher = longer scales)
   patternPeriod: 8.0,          // Repeat cycle for dorsal diamond pattern in rows
-  crawlSpeed: 0.85,            // Steady upward crawl speed (scale units per second)
+  crawlSpeed: 0.95,            // Steady upward crawl speed (scale units per second)
 
   // 3D Cylindrical Foreshortening
   maxTheta: 1.44,              // Horizon curvature wrapping angle (radians, ~82 deg)
-  cylinderFalloffExp: 0.75,    // Edge vignette falloff exponent (higher = darker sides)
+  cylinderFalloffExp: 0.80,    // Edge vignette falloff exponent (higher = darker sides)
 
   // Scale Relief & Shingling Mechanics
   scaleContourPower: 1.30,     // Contour shape exponent (1.0 = diamond, 2.0 = ellipse)
