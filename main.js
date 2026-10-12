@@ -7,57 +7,57 @@ export const CONFIG = {
   // ---------------------------------------------------------------------------
   // 1. SCALE SHAPE & CONTOUR
   // ---------------------------------------------------------------------------
-  scaleColumns: 10.0,          // [min: 4.0, max: 24.0] Scales across body (lower = larger scales)
-  scaleAspect: 1.55,           // [min: 0.6, max: 3.0]  Vertical elongation (higher = longer/slenderer scales)
-  scaleContourPower: 1.30,     // [min: 0.8, max: 2.5]  Shape contour (0.8 = sharp pointed diamond, 2.0 = rounded oval spade)
-  keelSharpness: 0.72,         // [min: 0.1, max: 2.0]  Crest roundness (higher = defined rounded spine, lower = flatter dome)
+  scaleColumns: 10.0,          // [min: 4.0, max: 24.0] Scale size. Higher = smaller scales. Lower = larger scales.
+  scaleAspect: 1.55,           // [min: 0.6, max: 3.0]  Scale length. Higher = long and thin. Lower = short and wide.
+  scaleContourPower: 1.30,     // [min: 0.8, max: 2.5]  Scale outline. Higher = round oval. Lower = sharp pointed diamond.
+  keelSharpness: 0.72,         // [min: 0.1, max: 2.0]  Scale center ridge. Higher = soft round crest. Lower = sharp raised spine.
 
   // ---------------------------------------------------------------------------
   // 2. SCALE OVERLAP & 3D RELIEF
   // ---------------------------------------------------------------------------
-  scaleOverlap: 0.40,          // [min: 0.05, max: 0.80] Shingle overlap amount (how far each scale overlaps the one below)
-  lipLiftHeight: 0.35,         // [min: 0.05, max: 0.80] Elevation / step-drop of trailing edge above the underlying body
-  dropShadowStrength: 0.65,    // [min: 0.0, max: 1.0]  Darkness of contact drop shadow under the overlapping lip
-  reliefDepth: 28.0,           // [min: 0.0, max: 60.0] 3D normal depth from surface gradients (0 = flat 2D)
+  scaleOverlap: 0.40,          // [min: 0.05, max: 0.80] Shingle overlap. Higher = scales cover more of the scale below. Lower = less coverage.
+  lipLiftHeight: 0.35,         // [min: 0.05, max: 0.80] Scale tip height. Higher = tip lifts higher off the body. Lower = flatter surface.
+  dropShadowStrength: 0.65,    // [min: 0.0, max: 1.0]  Shadow darkness under the scale tip. Higher = black shadow. Lower = faint shadow.
+  reliefDepth: 28.0,           // [min: 0.0, max: 60.0] 3D bump strength. Higher = deep 3D bumps. Lower = flat 2D look (0 is completely flat).
 
   // ---------------------------------------------------------------------------
   // 3. GLEAM & SPECULAR SHINE
   // ---------------------------------------------------------------------------
-  gleamOverall: 1.0,           // [min: 0.0, max: 2.5]  Master multiplier for all specular gleam & shine
-  gleamSpineStrength: 0.45,    // [min: 0.0, max: 1.5]  Gleam brightness along central spine / crest
-  gleamSpineTightness: 55.0,   // [min: 10., max: 120.] Pinpoint glint tightness (higher = smaller sharp glint)
-  gleamSheenStrength: 0.32,    // [min: 0.0, max: 1.5]  Broad waxy keratin sheen brightness
-  gleamSheenTightness: 16.0,   // [min: 2.0, max: 64.0] Broad sheen spread (higher = tighter gloss, lower = diffuse wax)
-  gleamLipHighlight: 0.35,     // [min: 0.0, max: 1.5]  Gleam highlight brightness along rounded trailing rim
+  gleamOverall: 1.0,           // [min: 0.0, max: 2.5]  Master shine control. Higher = wet and shiny. Lower = dull matte (0 turns off shine).
+  gleamSpineStrength: 0.45,    // [min: 0.0, max: 1.5]  Spine gleam brightness. Higher = bright light streak along center. Lower = dim streak.
+  gleamSpineTightness: 55.0,   // [min: 10., max: 120.] Spine gleam size. Higher = narrow sharp streak. Lower = wide soft highlight.
+  gleamSheenStrength: 0.32,    // [min: 0.0, max: 1.5]  Body sheen brightness. Higher = glossy polish over scale body. Lower = dry matte.
+  gleamSheenTightness: 16.0,   // [min: 2.0, max: 64.0] Body sheen area. Higher = small tight shine spot. Lower = wide soft waxy sheen.
+  gleamLipHighlight: 0.35,     // [min: 0.0, max: 1.5]  Rim edge gleam. Higher = glowing outline on scale bottom edge. Lower = no edge light.
 
   // ---------------------------------------------------------------------------
   // 4. MOTION & CURVATURE
   // ---------------------------------------------------------------------------
-  crawlSpeed: 0.95,            // [min: -3.0, max: 4.0] Upward speed (scale rows/sec; negative = crawls down)
-  patternPeriod: 8.0,          // [min: 2.0, max: 16.0] Repeat cycle in rows (must be an even integer)
-  maxTheta: 1.44,              // [min: 0.2, max: 1.54] Curvature wrap angle in radians (higher = steeper edge curving)
-  cylinderFalloffExp: 0.80,    // [min: 0.1, max: 2.5]  Side vignette falloff exponent (higher = darker sides)
+  crawlSpeed: 0.95,            // [min: -3.0, max: 4.0] Crawl speed. Positive = crawls up. Negative = crawls down. 0 = pause.
+  patternPeriod: 8.0,          // [min: 2.0, max: 16.0] Diamond pattern repeat rows. Must be an even whole number.
+  maxTheta: 1.44,              // [min: 0.2, max: 1.54] Body roundness. Higher = sides curve sharply away from camera. Lower = flat back.
+  cylinderFalloffExp: 0.80,    // [min: 0.1, max: 2.5]  Edge shadow darkness. Higher = dark black edges. Lower = evenly lit edges.
 
   // ---------------------------------------------------------------------------
   // 5. LIGHTING & ENVIRONMENT
   // ---------------------------------------------------------------------------
-  lightDir: [0.0, 0.40, 0.91], // [X: -1 to 1, Y: -1 to 1, Z: 0.1 to 1] Overhead key light direction vector
-  ambientStrength: 0.26,       // [min: 0.0, max: 1.0]  Base ambient fill lighting
-  diffuseStrength: 1.0,        // [min: 0.0, max: 2.0]  Directional diffuse multiplier
-  rimLightStrength: 0.40,      // [min: 0.0, max: 1.0]  Subsurface rim glow at cylinder edges
+  lightDir: [0.0, 0.40, 0.91], // [X: left/right, Y: down/up, Z: front] Direction of the main light source in 3D space.
+  ambientStrength: 0.26,       // [min: 0.0, max: 1.0]  Shadow brightness. Higher = bright washed-out shadows. Lower = dark deep shadows.
+  diffuseStrength: 1.0,        // [min: 0.0, max: 2.0]  Direct light brightness. Higher = strong bright light. Lower = dim soft light.
+  rimLightStrength: 0.40,      // [min: 0.0, max: 1.0]  Edge backlight glow. Higher = bright halo on outer sides. Lower = no edge glow.
 
   // ---------------------------------------------------------------------------
   // 6. COLOR PALETTE (RGB normalized [0.0 - 1.0])
   // ---------------------------------------------------------------------------
-  colorButterCream: [0.93, 0.86, 0.62], // [0-1, 0-1, 0-1] Pale ivory / butter-yellow markings
-  colorDarkCharcoal: [0.12, 0.10, 0.08], // [0-1, 0-1, 0-1] Deep espresso / charcoal diamond borders
-  colorWarmOchre: [0.62, 0.50, 0.33],    // [0-1, 0-1, 0-1] Warm amber / buff body scales
-  colorOliveTan: [0.48, 0.42, 0.28],     // [0-1, 0-1, 0-1] Muted olive-tan flank scale variation
+  colorButterCream: [0.93, 0.86, 0.62], // [Red, Green, Blue] Light cream color for diamond centers and borders.
+  colorDarkCharcoal: [0.12, 0.10, 0.08], // [Red, Green, Blue] Dark black-brown color for diamond borders.
+  colorWarmOchre: [0.62, 0.50, 0.33],    // [Red, Green, Blue] Warm tan base color for body scales.
+  colorOliveTan: [0.48, 0.42, 0.28],     // [Red, Green, Blue] Olive gray color mixed into body scales for variety.
 
   // ---------------------------------------------------------------------------
   // 7. PERFORMANCE
   // ---------------------------------------------------------------------------
-  maxDpr: 2.0                  // [min: 1.0, max: 3.0]  Maximum devicePixelRatio cap (prevents mobile GPU throttling)
+  maxDpr: 2.0                  // [min: 1.0, max: 3.0]  Display sharpness cap. 1.0 = fast on mobile. 2.0 = crisp retina. 3.0 = heavy GPU load.
 };
 
 // Programmatic min/max bounds and step increments for UI / controllers
