@@ -16,7 +16,7 @@ export const CONFIG = {
 
   // Scale Relief & Shingling Mechanics
   scaleContourPower: 1.30,     // [min: 0.80, max: 2.50] Shape contour exponent (0.8 = sharp diamond, 2.0 = rounded oval)
-  keelSharpness: 0.72,         // [min: 0.30, max: 1.50] Keel ridge exponent (smaller = sharper central ridge)
+  keelSharpness: 0.72,         // [min: 0.20, max: 2.00] Keel crest curvature (higher = defined rounded spine, lower = flatter dome)
   reliefDepth: 28.0,           // [min: 0.00, max: 60.0] Normal depth from surface derivatives (0 = flat 2D)
   dropShadowStrength: 0.65,    // [min: 0.00, max: 1.00] Darkness of contact drop shadow under trailing lip
   lipHighlightStrength: 0.35,  // [min: 0.00, max: 1.00] Brightness of highlight on trailing edge
@@ -155,7 +155,7 @@ float hash21(vec2 p) {
   return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
 }
 
-// Lanceolate keeled scale evaluator (matching anatomical reference photo)
+// Lanceolate keeled scale evaluator with smooth, rounded interior camber
 // Returns vec4(spadeDist, surfaceHeight, idHash, macroPatternDist)
 vec4 evalScale(float cu, float cv, float u, float v) {
   vec2 d = vec2(u - cu, v - cv);
@@ -167,18 +167,23 @@ vec4 evalScale(float cu, float cv, float u, float v) {
   // d.y < 0 is the trailing caudal tip (tapered spade), d.y > 0 is cranial root (tucked)
   float sy = d.y < 0.0 ? abs(d.y) / 0.98 : d.y / 0.82;
 
-  // Lanceolate spade contour: blend between rounded diamond and ovate petal
+  // Lanceolate spade perimeter boundary
   float spadeDist = pow(pow(sx, CONTOUR_POW) + pow(sy, CONTOUR_POW), 1.0 / CONTOUR_POW);
 
   // Longitudinal tilt: trailing caudal tip is thick and lifted above the body
-  float ramp = mix(0.18, 1.05, smoothstep(0.80, -0.65, d.y));
+  float ramp = mix(0.20, 1.05, smoothstep(0.85, -0.65, d.y));
 
-  // Raised central keel ridge running down d.x = 0
-  float keel = pow(clamp(1.0 - sx, 0.0, 1.0), KEEL_SHARPNESS);
+  // 1. SMOOTH INTERIOR CAMBER (No hard pyramid divider / crease):
+  // Using quadratic u2 ensures d(height)/dx = 0 at the central spine (dx = 0).
+  // This produces a continuous, organically rounded pebble-like dome across the scale.
+  float u2 = clamp(sx * sx, 0.0, 1.0);
+  float crossDome = clamp(1.0 - u2, 0.0, 1.0);
+  float softSpine = exp(-u2 * KEEL_SHARPNESS * 4.0);
+  float interiorCamber = mix(crossDome, crossDome * 0.45 + softSpine * 0.55, 0.55);
 
-  // Fleshy scale dome with elevated trailing lip
-  float dome = sqrt(clamp(1.0 - clamp(spadeDist, 0.0, 1.0) * 0.45, 0.0, 1.0));
-  float height = ramp * (0.38 + 0.62 * keel) * dome;
+  // Outer lip thickness profile (thick trailing edge stepping down to underlying scale)
+  float lipProfile = smoothstep(1.04, 0.65, spadeDist);
+  float height = ramp * interiorCamber * (0.35 + 0.65 * lipProfile);
 
   // Discrete scale ID for pattern and organic variance
   vec2 scaleId = vec2(floor(cu), pmod(floor(cv), PATTERN_PERIOD));
@@ -272,9 +277,9 @@ vec3 computeColor() {
   float diff = max(dot(N, LIGHT_DIR), 0.0);
   float cylVignette = pow(clamp(cos(theta), 0.0, 1.0), CYL_FALLOFF_EXP);
 
-  // Keratin specular highlights: broad sheen plus sharp keel glint
+  // Keratin specular highlights: broad waxy sheen plus smooth crest gleam
   float specBroad = pow(max(dot(N, halfDir), 0.0), SPEC_BROAD_EXP);
-  float specKeel = pow(max(dot(N, halfDir), 0.0), SPEC_KEEL_EXP) * clamp(1.0 - abs(dhdx * 10.0), 0.0, 1.0);
+  float specKeel = pow(max(dot(N, halfDir), 0.0), SPEC_KEEL_EXP);
 
   // Subsurface rim lighting around curving cylinder horizon
   float rim = pow(clamp(1.0 - max(dot(nCyl, viewDir), 0.0), 0.0, 1.0), 2.2) * RIM_STR;
